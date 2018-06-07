@@ -186,3 +186,91 @@ class Calculator (Stack):
 
 		#finally set the mainloop
 		self.root.mainloop ()
+		
+	def chcknum (self, token):
+		try:
+			t = float (token)
+			return True
+		except ValueError:
+			return False
+
+	#this function handles the pressing of keys on keyboard
+	def handleKeypress (self, event):
+		if event.char in "0123456789":
+			try:
+				self.putDigit (event, int (event.char))
+			except ValueError:
+				pass
+		elif event.char in "+-*/^":
+			oper_sym = {'+': '+', '-': '-', '*': 'x', '/': '÷', '^': '^'}
+			self.putBinaryOper (event, event.char, oper_sym [event.char])
+		elif event.char == ".":
+			self.putDecimal (event)
+		elif event.char == '(':
+			self.putOpenPar (event)
+		elif event.char == ')':
+			self.putClosePar (event)
+		elif ord (event.char) == 8:
+			self.delete (event)
+		elif ord (event.char) == 127:
+			self.clearAll (event)
+		elif ord (event.char) == 13:
+			self.evaluate (event)
+		# else:
+		# 	print event.char, ord (event.char)
+
+	#this function deals with putting digits appropriately
+	def putDigit (self, event, digit):
+		ls = self.act_exprsn.split ()
+		if self.state == 0 or self.state == 2:
+			self.act_exprsn = repr (digit)
+			self.exprsn = repr (digit)
+			self.state = 1
+		elif len (ls) > 0 and ls[-1] in ')!':
+			self.act_exprsn += " * " + repr (digit)
+			self.exprsn += repr (digit)
+		else:
+			self.act_exprsn += repr (digit)
+			self.exprsn += repr (digit)
+		self.calcans.config (text = self.exprsn)
+
+	#puts the mathematical constants, e and Pi, after required checking according to the conditions
+	def putConstant (self, event, symbol, val):
+		ls = self.act_exprsn.split ()
+		if self.state == 0 or self.state == 2:
+			self.act_exprsn = val + " "
+			self.exprsn = symbol
+			self.state = 1
+		elif len (ls) > 0 and (ls[-1] in ')!' or self.chcknum (ls[-1]) in [0,1]):
+			self.act_exprsn += " * " + val
+			self.exprsn += symbol
+		else:
+			self.act_exprsn += val
+			self.exprsn += symbol
+		self.calcans.config (text = self.exprsn)
+
+	#puts the open paranthesis after required checking according to the conditions
+	def putOpenPar (self, event):
+		ls = self.act_exprsn.split ()
+		if self.state == 0 or self.state == 2:
+			self.act_exprsn = "( "
+			self.exprsn = "("
+			self.state = 1
+		elif len (ls) > 0 and self.chcknum (ls[-1]):
+			self.act_exprsn += " * ( "
+			self.exprsn += "("
+		else:
+			self.act_exprsn += " ( "
+			self.exprsn += "("
+		self.calcans.config (text = self.exprsn)
+
+	#puts the closed paranthesis after required checking according to the conditions
+	def putClosePar (self, event):
+		if self.state == 0 or self.state == 2:
+			self.act_exprsn = ") "
+			self.exprsn = " )"
+			self.state = 1
+		else:
+			self.act_exprsn += " ) "
+			self.exprsn += ")"
+		self.calcans.config (text = self.exprsn)
