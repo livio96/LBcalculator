@@ -274,3 +274,278 @@ class Calculator (Stack):
 			self.act_exprsn += " ) "
 			self.exprsn += ")"
 		self.calcans.config (text = self.exprsn)
+	
+	#this function handles the putting of decimal point properly
+	def putDecimal (self, event):
+		ls = self.act_exprsn.split ()
+		if self.state == 0 or self.state == 2:
+			self.act_exprsn = "0."
+			self.exprsn = "."
+			self.state = 1
+		elif len (ls) > 0 and ls[-1] in '(+-*/':
+			self.act_exprsn += " 0."
+			self.exprsn += "."
+		elif '.' not in ls[-1]:
+			self.act_exprsn += "."
+			self.exprsn += "."
+		self.calcans.config (text = self.exprsn)
+
+	#this function handles the binary operators i.e., +, -, *, /, ^
+	def putBinaryOper (self, event, operator, symbol):
+		ls = self.act_exprsn.split ()
+		if self.state == 0:
+			self.act_exprsn = "0 " + operator + " "
+			self.exprsn = symbol
+			self.state = 1
+		elif self.state == 2:
+			self.act_exprsn = self.exprsn + " " + operator + " "
+			self.exprsn += symbol
+			self.state = 1
+		elif len (ls) > 0 and (ls[-1] == ')' or self.chcknum (ls[-1]) in [0,1]):
+			self.act_exprsn += " " + operator + " "
+			self.exprsn += symbol
+		elif len (ls) > 0 and ls[-1] in '+-*/^!':
+			ls[-1] = operator
+			self.act_exprsn = ' '.join (ls)
+			self.exprsn = ''.join (ls[:-1]) + symbol
+		elif len (ls) > 0 and ls[-1] == '(':
+			if operator in "+-":
+				self.act_exprsn += " 0 " + operator + " "
+			else:
+				self.act_exprsn += operator + " "
+			self.exprsn += symbol
+		self.calcans.config (text = self.exprsn)
+
+	#this function handles the unary operators i.e., sin, cos, tan, log, ln
+	def putUnaryOper (self, event, operator):
+		ls = self.act_exprsn.split ()
+		if self.state == 0 or self.state == 2:
+			self.act_exprsn = operator + " ( "
+			self.exprsn = operator + "("
+			self.state = 1
+		elif ls[-1] in '(+-*/^': #or len (ls) == 0
+			self.act_exprsn += " " + operator + " ( "
+			self.exprsn += operator + "("
+		elif self.chcknum (ls[-1]) or ls[-1] in ')!':
+			self.act_exprsn += " * " + operator + " ( "
+			self.exprsn += operator + "("
+		self.calcans.config (text = self.exprsn)
+
+	#this function handles the square root
+	def calcSqrt (self, event):
+		ls = self.act_exprsn.split ()
+		if self.state == 0 or self.state == 2:
+			self.act_exprsn = "√ "
+			self.exprsn = "√"
+			self.state = 1
+		elif ls[-1] in '(+-*/^': #or len (ls) == 0
+			self.act_exprsn += " √ "
+			self.exprsn += "√"
+		elif self.chcknum (ls[-1]) or ls[-1] in ')!':
+			self.act_exprsn += " * √ "
+			self.exprsn += "√"
+		self.calcans.config (text = self.exprsn)
+
+	#this function handles the factorial
+	def calcFactorial (self, event):
+		ls = self.act_exprsn.split ()
+		if self.state == 0 or self.state == 2:
+			self.act_exprsn = "0 ! "
+			self.exprsn = "0!"
+			self.state = 1
+		elif len (ls) > 0 and ls[-1] in '+-*/^!':
+			ls[-1] = "!"
+			self.act_exprsn = ' '.join (ls)
+			self.exprsn = ''.join (ls)
+		else:#elif (len (ls) > 0 and ls[-1].isdigit ()):
+			self.act_exprsn += " ! "
+			self.exprsn += "!"
+		self.calcans.config (text = self.exprsn)
+
+	#the clear function which clears one digit at a time
+	def delete (self, event):
+		ls = self.act_exprsn.split ()
+		if self.state == 0 or self.state == 2:
+			pass
+		elif len (ls) > 0:
+			t = ls.pop ()
+			if t == "/":
+				t = ""
+				self.exprsn = self.exprsn[:-1]
+			elif t not in map (repr, [math.pi, math.e]):
+				t = t[:-1]
+				ls.append (t)
+			self.act_exprsn = ' '.join (ls)
+			self.exprsn = self.exprsn[:-1]
+			if len (self.exprsn) == 0:
+				self.exprsn = "0"
+				self.state = 0
+		# else:
+		# 	self.act_exprsn = ""
+		# 	self.exprsn = "0"
+		self.calcans.config (text = self.exprsn)
+
+	#the all clear function
+	def clearAll (self, event):
+		self.act_exprsn = ""
+		self.exprsn = "0"
+		self.state = 0
+		self.calcans.config (text = self.exprsn)
+		self.calcexpr.config (text = "")
+
+	#calls the infixEval function with the proper expression, does error checking and resets everything
+	def evaluate (self, event):
+		try:
+			res = self.infixEval ()
+			self.calcexpr.config (text = self.exprsn + '=')
+			self.calcans.config (text = repr (res))
+			self.act_exprsn = repr (res) + " "
+			self.exprsn = repr (res)
+			self.state = 2
+		except (IndexError, ValueError) as e:
+			self.calcexpr.config (text = "")
+			self.calcans.config (text = "Error")
+			self.act_exprsn = ""
+			self.exprsn = ""
+		except (ZeroDivisionError, OverflowError) as e:
+			self.calcexpr.config (text = self.exprsn)
+			self.calcans.config (text = "∞")
+			self.act_exprsn = "∞ "
+			self.exprsn = "∞"
+			self.state = 2
+
+
+	#evaluates an infix expression by converting it to postfix and then solves it using stack
+	def infixEval (self):
+		s = Stack ()
+		outlst = []
+		tokenlst = self.act_exprsn.split ()
+
+		prec = {}
+		prec ['sin'] = 5
+		prec ['cos'] = 5
+		prec ['tan'] = 5
+		prec ['log'] = 5
+		prec ['ln'] = 5
+		prec ['√'] = 5
+		prec ['!'] = 5
+		prec ['^'] = 4
+		prec ['/'] = 3
+		prec ['*'] = 3
+		prec ['+'] = 2
+		prec ['-'] = 2
+		prec ['('] = 1
+
+		oplstbin = ['/', '*', '+', '-', '^']
+		oplstun = ['sin', 'cos', 'tan', 'log', 'ln', '√', '!']
+
+		s.push ('(')
+		tokenlst.append (')')
+
+		for token in tokenlst:
+			if token == '(':
+				s.push (token)
+			elif token == ')':
+				if not s.isEmpty ():
+					topToken = s.pop ()
+				while topToken != '(':
+					outlst.append (topToken)
+					topToken = s.pop ()
+
+			elif token in oplstbin:
+				if prec [s.peek ()] == prec [token]:
+					if outlst [-1] not in oplstbin or outlst [-1] not in oplstun:
+						num2 = float (outlst.pop ())
+					if outlst [-1] in oplstbin or outlst [-1] in oplstun:
+						outlst = outlst + [repr (num2)]
+					else:
+						num1 = float (outlst.pop ())
+						t = s.pop ()
+						res = 0
+						if t == '+':
+							res = num1+num2
+						elif t == '-':
+							res = num1-num2
+						elif t == '*':
+							res = num1*num2
+						elif t == '/':
+							res = num1/num2
+						elif t == '^':
+							res = math.pow (num1, num2)
+						outlst = outlst + [repr (res)]
+				while prec [s.peek ()] > prec [token]:
+					outlst.append (s.pop ())
+				s.push (token)
+
+			elif token in oplstun:
+				s.push (token)
+
+			else:
+				outlst.append (token)
+
+		while not s.isEmpty ():
+			if s.peek () == '(':
+				s.pop ()
+			else:
+				outlst.append (s.pop ())
+
+		for token in outlst:
+
+			if token in oplstbin:
+				num2 = float (s.pop ())
+				num1 = float (s.pop ())
+				res = 0
+				if token == '+':
+					res = num1+num2
+				elif token == '-':
+					res = num1-num2
+				elif token == '*':
+					res = num1*num2
+				elif token == '/':
+					res = num1/num2
+				elif token == '^':
+					res = num1**num2
+				s.push (repr (res))
+
+			elif token in oplstun:
+				num = float (s.pop ())
+				res = 0
+				if token == 'sin':
+					res = math.sin (num)
+				elif token == 'cos':
+					res = math.cos (num)
+				elif token == 'tan':
+					res = math.tan (num)
+				elif token == 'log':
+					res = math.log10 (num)
+				elif token == 'ln':
+					res = math.log (num)
+				elif token == '√':
+					res = math.sqrt (num)
+				elif token == '!':
+					if math.floor (num) == math.ceil (num):
+						res = float (math.factorial (int (num)))
+					else:
+						res = float (math.factorial (num))
+				s.push (repr (res))
+
+			else:
+				s.push (token)
+
+		result = round (float (s.pop ()), 15)
+		# if not s.isEmpty ():
+		# 	while not s.isEmpty ():
+				# if self.chcknum (s.pop ()):
+				# 	raise IndexError
+		if math.floor (result) == math.ceil (result) and not abs(result)//10**16:
+			return int (result)
+		else:
+			return result
+
+#main function
+def main ():
+	mycalc = Calculator ()
+
+if __name__ == "__main__":
+	main ()
+
